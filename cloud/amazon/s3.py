@@ -142,6 +142,11 @@ options:
     default: null
     aliases: []
     version_added: "1.3"
+  website:
+    description:
+      - Enable bucket as static website hosting.
+    required: false
+    default: false
 
 requirements: [ "boto" ]
 author:
@@ -237,7 +242,7 @@ def bucket_check(module, s3, bucket):
     else:
         return False
 
-def create_bucket(module, s3, bucket, location=None):
+def create_bucket(module, s3, bucket, website, location=None):
     if location is None:
         location = Location.DEFAULT
     try:
@@ -386,6 +391,7 @@ def main():
             retries        = dict(aliases=['retry'], type='int', default=0),
             s3_url         = dict(aliases=['S3_URL']),
             src            = dict(),
+            website        = dict(default=False, type='bool'),
         ),
     )
     module = AnsibleModule(argument_spec=argument_spec)
@@ -410,6 +416,7 @@ def main():
     retries = module.params.get('retries')
     s3_url = module.params.get('s3_url')
     src = module.params.get('src')
+    website = module.params.get('website')
 
     for acl in module.params.get('permission'):
         if acl not in CannedACLStrings:
@@ -553,7 +560,7 @@ def main():
 
         # If neither exist (based on bucket existence), we can create both.
         if bucketrtn is False and pathrtn is True:
-            create_bucket(module, s3, bucket, location)
+            create_bucket(module, s3, bucket, website, location)
             upload_s3file(module, s3, bucket, obj, src, expiry, metadata, encrypt, headers)
 
         # If bucket exists but key doesn't, just upload.
@@ -607,7 +614,7 @@ def main():
             if bucketrtn is True:
                 module.exit_json(msg="Bucket already exists.", changed=False)
             else:
-                module.exit_json(msg="Bucket created successfully", changed=create_bucket(module, s3, bucket, location))
+                module.exit_json(msg="Bucket created successfully", changed=create_bucket(module, s3, bucket, website, location))
         if bucket and obj:
             bucketrtn = bucket_check(module, s3, bucket)
             if obj.endswith('/'):
@@ -621,7 +628,7 @@ def main():
                 else:
                     create_dirkey(module, s3, bucket, dirobj)
             if bucketrtn is False:
-                created = create_bucket(module, s3, bucket, location)
+                created = create_bucket(module, s3, bucket, website, location)
                 create_dirkey(module, s3, bucket, dirobj)
 
     # Support for grabbing the time-expired URL for an object in S3/Walrus.
